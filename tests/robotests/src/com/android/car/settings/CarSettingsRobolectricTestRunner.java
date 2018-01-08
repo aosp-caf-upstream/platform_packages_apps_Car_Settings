@@ -15,20 +15,14 @@
  */
 package com.android.car.settings;
 
-import android.app.Activity;
-import android.app.Fragment;
-import android.content.Intent;
 import org.junit.runners.model.InitializationError;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
 import org.robolectric.manifest.AndroidManifest;
 import org.robolectric.res.Fs;
 import org.robolectric.res.ResourcePath;
-import org.robolectric.util.ActivityController;
-import org.robolectric.util.ReflectionHelpers;
 
 import java.util.List;
-
 
 /**
  * Custom test runner for the testing of BluetoothPairingDialogs. This is needed because the
@@ -58,29 +52,25 @@ public class CarSettingsRobolectricTestRunner extends RobolectricTestRunner {
 
         // By adding any resources from libraries we need to the AndroidManifest, we can access
         // them from within the parallel universe's resource loader.
-        final AndroidManifest manifest = new AndroidManifest(Fs.fileFromPath(manifestPath),
-                Fs.fileFromPath(resDir), Fs.fileFromPath(assetsDir)) {
+        return new AndroidManifest(Fs.fileFromPath(manifestPath), Fs.fileFromPath(resDir),
+            Fs.fileFromPath(assetsDir), "com.android.car.settings") {
             @Override
             public List<ResourcePath> getIncludedResourcePaths() {
                 List<ResourcePath> paths = super.getIncludedResourcePaths();
                 paths.add(new ResourcePath(
-                        getPackageName(),
+                        null,
                         Fs.fileFromPath("./packages/apps/Car/Settings/res"),
                         null));
                 paths.add(new ResourcePath(
-                        getPackageName(),
+                        null,
                         Fs.fileFromPath("./frameworks/base/packages/SettingsLib/res"),
                         null));
                 paths.add(new ResourcePath(
-                        getPackageName(),
+                        null,
                         Fs.fileFromPath("./frameworks/base/core/res/res"),
                         null));
                 return paths;
             }
         };
-
-        // Set the package name to the renamed one
-        manifest.setPackageName("com.android.car.settings");
-        return manifest;
     }
 }

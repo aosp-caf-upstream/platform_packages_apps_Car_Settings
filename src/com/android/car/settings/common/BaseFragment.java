@@ -16,10 +16,10 @@
 
 package com.android.car.settings.common;
 
-import android.app.Fragment;
 import android.os.Bundle;
 import android.support.annotation.LayoutRes;
 import android.support.annotation.StringRes;
+import android.support.v4.app.Fragment;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
@@ -51,8 +51,9 @@ public abstract class BaseFragment extends Fragment {
 
         /**
          * Pops the top off the fragment stack.
+         * @return {@code false} if there's no stack to pop, {@code true} otherwise
          */
-        void goBack();
+        boolean goBack();
     }
 
     @LayoutRes

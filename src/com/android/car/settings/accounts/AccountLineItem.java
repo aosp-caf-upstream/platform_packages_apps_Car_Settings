@@ -13,15 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
+package com.android.car.settings.accounts;
 
-package com.android.car.settings.users;
-
+import android.accounts.Account;
 import android.annotation.NonNull;
-import android.app.ActivityManager;
 import android.content.Context;
 import android.content.pm.UserInfo;
-import android.graphics.Bitmap;
-import android.os.UserManager;
+import android.graphics.drawable.Drawable;
 import android.view.View;
 import android.widget.ImageView;
 
@@ -30,36 +28,36 @@ import com.android.car.settings.R;
 import com.android.car.settings.common.BaseFragment;
 
 /**
- * Represents a user in settings page.
+ * Builds the account list in Settings page.
  */
-public class UserLineItem extends IconTextLineItem {
+public class AccountLineItem extends IconTextLineItem {
     private final Context mContext;
     private final UserInfo mUserInfo;
-    private final UserManager mUserManager;
+    private final Account mAccount;
     private final BaseFragment.FragmentController mFragmentController;
 
-    public UserLineItem(
+    public AccountLineItem(
             @NonNull Context context,
             UserInfo userInfo,
-            UserManager userManager,
+            Account account,
             BaseFragment.FragmentController fragmentController) {
-        super(userInfo.name);
+        super(account.name);
         mContext = context;
         mUserInfo = userInfo;
-        mUserManager = userManager;
+        mAccount = account;
         mFragmentController = fragmentController;
     }
 
     @Override
     public void bindViewHolder(IconTextLineItem.ViewHolder viewHolder) {
         super.bindViewHolder(viewHolder);
-        viewHolder.titleView.setText(isCurrentUser(mUserInfo)
-                ? mContext.getString(R.string.current_user_name, mUserInfo.name) : mUserInfo.name);
+        viewHolder.titleView.setText(mAccount.name);
     }
 
     @Override
     public void onClick(View view) {
-        mFragmentController.launchFragment(UserDetailsSettingsFragment.getInstance(mUserInfo));
+        mFragmentController.launchFragment(
+                AccountDetailsFragment.newInstance(mAccount, mUserInfo));
     }
 
     @Override
@@ -79,20 +77,14 @@ public class UserLineItem extends IconTextLineItem {
 
     @Override
     public void setIcon(ImageView iconView) {
-        Bitmap picture = mUserManager.getUserIcon(mUserInfo.id);
+        AccountHelper accountHelper = new AccountHelper(mContext, mUserInfo.getUserHandle());
+        Drawable picture = accountHelper.getDrawableForType(mContext, mAccount.type);
 
         if (picture != null) {
-            int avatarSize = mContext.getResources()
-                    .getDimensionPixelSize(R.dimen.car_primary_icon_size);
-            picture = Bitmap.createScaledBitmap(
-                    picture, avatarSize, avatarSize, true);
-            iconView.setImageBitmap(picture);
+            iconView.setImageDrawable(picture);
         } else {
+            // TODO: Have a new drawable for default account icon.
             iconView.setImageDrawable(mContext.getDrawable(R.drawable.ic_user));
         }
-    }
-
-    private boolean isCurrentUser(UserInfo userInfo) {
-        return ActivityManager.getCurrentUser() == userInfo.id;
     }
 }

@@ -18,25 +18,32 @@ package com.android.car.settings.common;
 
 import android.os.Bundle;
 
-import com.android.car.list.TypedPagedListAdapter;
 import com.android.car.settings.R;
 
-import java.util.ArrayList;
+import java.util.List;
 
 import androidx.car.widget.DayNightStyle;
+import androidx.car.widget.ListItem;
+import androidx.car.widget.ListItemAdapter;
+import androidx.car.widget.ListItemProvider.ListProvider;
 import androidx.car.widget.PagedListView;
 
 /**
  * Settings page that only contain a list of items.
+ * <p>
+ * Uses support library ListItemAdapter, unlike ListSettingsFragment that uses the car-list
+ * lists.
  */
-public abstract class ListSettingsFragment extends BaseFragment {
+public abstract class ListItemSettingsFragment extends BaseFragment {
+    private ListItemAdapter mListAdapter;
+    private ListProvider mItemProvider;
 
-    protected PagedListView mListView;
-    protected TypedPagedListAdapter mPagedListAdapter;
-
+    /**
+     * Gets bundle adding the list_fragment layout to it.
+     */
     protected static Bundle getBundle() {
         Bundle bundle = BaseFragment.getBundle();
-        bundle.putInt(EXTRA_LAYOUT, R.layout.list);
+        bundle.putInt(EXTRA_LAYOUT, R.layout.list_fragment);
         return bundle;
     }
 
@@ -44,14 +51,17 @@ public abstract class ListSettingsFragment extends BaseFragment {
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
 
-        mListView = (PagedListView) getView().findViewById(R.id.list);
-        mListView.setDayNightStyle(DayNightStyle.FORCE_DAY);
-        mPagedListAdapter = new TypedPagedListAdapter(getContext(), getLineItems());
-        mListView.setAdapter(mPagedListAdapter);
+        mItemProvider = new ListProvider(getListItems());
+        mListAdapter = new ListItemAdapter(getContext(), mItemProvider);
+
+        PagedListView listView = getView().findViewById(R.id.list);
+        listView.setDayNightStyle(DayNightStyle.FORCE_DAY);
+        listView.setAdapter(mListAdapter);
     }
 
     /**
-     * Gets a List of LineItems to show up in this activity.
+     * Called in onActivityCreated.
+     * Gets ListItems that should show up in the list.
      */
-    public abstract ArrayList<TypedPagedListAdapter.LineItem> getLineItems();
+    public abstract List<ListItem> getListItems();
 }
