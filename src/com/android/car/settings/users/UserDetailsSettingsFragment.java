@@ -16,42 +16,42 @@
 package com.android.car.settings.users;
 
 import android.app.ActivityManager;
-import android.content.Context;
 import android.content.pm.UserInfo;
 import android.os.Bundle;
-import android.os.RemoteException;
 import android.os.UserHandle;
-import android.os.UserManager;
-import android.text.Editable;
-import android.util.Log;
+import android.support.design.widget.TextInputEditText;
 import android.view.View;
-import android.widget.TextView;
+import android.widget.Button;
 
-import com.android.car.list.EditTextLineItem;
-import com.android.car.list.TypedPagedListAdapter;
 import com.android.car.settings.R;
-import com.android.car.settings.common.ListSettingsFragment;
-
-import java.util.ArrayList;
+import com.android.car.settings.common.BaseFragment;
 
 /**
- * Shows details of an user
+ * Shows details for a user with the ability to edit the name, remove user and switch.
  */
-public class UserDetailsSettingsFragment extends ListSettingsFragment {
-    private static final String TAG = "UserDetailsSettingsFragment";
-
+public class UserDetailsSettingsFragment extends BaseFragment implements
+        ConfirmRemoveUserDialog.ConfirmRemoveUserListener {
     public static final String EXTRA_USER_INFO = "extra_user_info";
-
+    private static final String TAG = "UserDetailsSettingsFragment";
     private UserInfo mUserInfo;
-    private UserManager mUserManager;
+
+    private boolean mCurrentUserIsOwner;
+    private boolean mIsCurrentUser;
+
+    private TextInputEditText mUserNameEditText;
+    private Button mOkButton;
+    private Button mCancelButton;
+
+    private UserManagerHelper mUserManagerHelper;
 
     public static UserDetailsSettingsFragment getInstance(UserInfo userInfo) {
         UserDetailsSettingsFragment
                 userSettingsFragment = new UserDetailsSettingsFragment();
-        Bundle bundle = ListSettingsFragment.getBundle();
+        Bundle bundle = BaseFragment.getBundle();
         bundle.putInt(EXTRA_ACTION_BAR_LAYOUT, R.layout.action_bar_with_button);
         bundle.putInt(EXTRA_TITLE_ID, R.string.user_settings_details_title);
         bundle.putParcelable(EXTRA_USER_INFO, userInfo);
+        bundle.putInt(EXTRA_LAYOUT, R.layout.user_details_fragment);
         userSettingsFragment.setArguments(bundle);
         return userSettingsFragment;
     }
@@ -60,96 +60,97 @@ public class UserDetailsSettingsFragment extends ListSettingsFragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         mUserInfo = getArguments().getParcelable(EXTRA_USER_INFO);
+        mCurrentUserIsOwner = ActivityManager.getCurrentUser() == UserHandle.USER_SYSTEM;
+        mIsCurrentUser = ActivityManager.getCurrentUser() == mUserInfo.id;
     }
 
     @Override
-    public ArrayList<TypedPagedListAdapter.LineItem> getLineItems() {
-        ArrayList<TypedPagedListAdapter.LineItem> lineItems = new ArrayList<>();
-        EditTextLineItem userNameLineItem = new EditTextLineItem(
-                getContext().getText(R.string.user_name_label),
-                mUserInfo.name);
-        userNameLineItem.setTextType(EditTextLineItem.TextType.TEXT);
-        userNameLineItem.setTextChangeListener(new EditTextLineItem.TextChangeListener() {
-            @Override
-            public void textChanged(Editable s) {
-                mUserManager.setUserName(mUserInfo.id, s.toString());
-            }
-        });
-        lineItems.add(userNameLineItem);
-        return lineItems;
+    public void onViewCreated(View view, Bundle savedInstanceState) {
+        mUserNameEditText = (TextInputEditText) view.findViewById(R.id.user_name_text_edit);
+        mOkButton = (Button) view.findViewById(R.id.ok_button);
+        mCancelButton = (Button) view.findViewById(R.id.cancel_button);
     }
 
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
-        mUserManager = (UserManager) getContext().getSystemService(Context.USER_SERVICE);
-        TextView removeUserBtn = getActivity().findViewById(R.id.action_button1);
-        removeUserBtn.setText(R.string.delete_button);
-        removeUserBtn.setOnClickListener(v -> removeUser());
+        mUserManagerHelper = new UserManagerHelper(getContext());
 
-        if (!isCurrentUser()) {
-            TextView switchUserBtn = getActivity().findViewById(R.id.action_button2);
-            switchUserBtn.setVisibility(View.VISIBLE);
-            switchUserBtn.setText(R.string.user_switch);
-            switchUserBtn.setOnClickListener(v -> switchTo());
-        }
+        configureUsernameEditing();
+
+        showRemoveUserButton();
+        showSwitchButton();
     }
 
-    private void removeUser() {
-        if (mUserInfo.id == UserHandle.USER_SYSTEM) {
-            Log.w(TAG, "User " + mUserInfo.id + " could not removed.");
-            return;
-        }
-        if (isCurrentUser()) {
-            switchToUserId(UserHandle.USER_SYSTEM);
-        }
-        if (mUserManager.removeUser(mUserInfo.id)) {
+    @Override
+    public void onRemoveUserConfirmed() {
+        if (mUserManagerHelper.removeUser(mUserInfo)) {
             getActivity().onBackPressed();
         }
     }
 
-    private boolean isCurrentUser() {
-        return ActivityManager.getCurrentUser() == mUserInfo.id;
+    private void configureUsernameEditing() {
+        // Set the User's name.
+        mUserNameEditText.setText(mUserInfo.name);
+
+        // Configure OK button.
+        mOkButton.setOnClickListener(view -> {
+            // Save new user's name.
+            mUserManagerHelper.setUserName(mUserInfo, mUserNameEditText.getText().toString());
+            getActivity().onBackPressed();
+        });
+
+        // Configure Cancel button.
+        mCancelButton.setOnClickListener(view -> {
+            getActivity().onBackPressed();
+        });
+
+        if (mIsCurrentUser /* Each user can edit their own name. */
+                || mCurrentUserIsOwner /* Owner can edit everyone's name. */) {
+            allowUserNameEditing();
+        } else {
+            mUserNameEditText.setEnabled(false);
+        }
     }
 
-    private void switchTo() {
-        if (isCurrentUser()) {
-            if (mUserInfo.isGuest()) {
-                switchToGuest();
+    private void allowUserNameEditing() {
+        mUserNameEditText.setEnabled(true);
+        mUserNameEditText.setSelectAllOnFocus(true);
+        mUserNameEditText.setOnFocusChangeListener((view, focus) -> {
+            if (focus || !mUserNameEditText.getText().toString().equals(mUserInfo.name)) {
+                // If name editor is in focus, or the user's name is changed, show OK and Cancel
+                // buttons to confirm or cancel the change.
+                mOkButton.setVisibility(View.VISIBLE);
+                mCancelButton.setVisibility(View.VISIBLE);
+            } else {
+                // Hide the buttons when user is not changing the user name.
+                mOkButton.setVisibility(View.GONE);
+                mCancelButton.setVisibility(View.GONE);
             }
-            return;
-        }
-
-        if (UserManager.isGuestUserEphemeral()) {
-            // If switching from guest, we want to bring up the guest exit dialog instead of switching
-            UserInfo currUserInfo = mUserManager.getUserInfo(ActivityManager.getCurrentUser());
-            if (currUserInfo != null && currUserInfo.isGuest()) {
-                //showExitGuestDialog(currUserId, record.resolveId());
-                return;
-            }
-        }
-
-        switchToUserId(mUserInfo.id);
-        getActivity().onBackPressed();
+        });
     }
 
-    private void switchToGuest() {
-        UserInfo guest = mUserManager.createGuest(
-                getContext(), getContext().getString(R.string.user_guest));
-        if (guest == null) {
-            // Couldn't create user, most likely because there are too many, but we haven't
-            // been able to reload the list yet.
-            Log.w(TAG, "can't create user.");
-            return;
-        }
-        switchToUserId(guest.id);
+    private void showRemoveUserButton() {
+        Button removeUserBtn = (Button) getActivity().findViewById(R.id.action_button1);
+        removeUserBtn.setText(R.string.delete_button);
+        removeUserBtn
+                .setOnClickListener(v -> {
+                    ConfirmRemoveUserDialog dialog =
+                            new ConfirmRemoveUserDialog();
+                    dialog.registerConfirmRemoveUserListener(this);
+                    dialog.show(this);
+                });
     }
 
-    private void switchToUserId(int id) {
-        try {
-            ActivityManager.getService().switchUser(id);
-        } catch (RemoteException e) {
-            Log.e(TAG, "Couldn't switch user.", e);
+    private void showSwitchButton() {
+        if (!mIsCurrentUser) {
+            Button switchUserBtn = (Button) getActivity().findViewById(R.id.action_button2);
+            switchUserBtn.setVisibility(View.VISIBLE);
+            switchUserBtn.setText(R.string.user_switch);
+            switchUserBtn.setOnClickListener(v -> {
+                mUserManagerHelper.switchToUser(mUserInfo);
+                getActivity().onBackPressed();
+            });
         }
     }
 }
