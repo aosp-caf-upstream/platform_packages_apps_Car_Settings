@@ -28,14 +28,9 @@ ifeq (,$(TARGET_BUILD_APPS))
   LOCAL_USE_AAPT2 := true
 
   LOCAL_STATIC_ANDROID_LIBRARIES := \
-      android-support-v4 \
-      android-support-car \
-      android-support-core-ui \
-      android-support-design \
-      android-support-v7-appcompat \
+      $(ANDROID_SUPPORT_CAR_TARGETS) \
       android-support-v7-preference \
-      android-support-v14-preference \
-      android-support-v7-recyclerview
+      android-support-v14-preference
 
   LOCAL_RESOURCE_DIR := \
       $(LOCAL_PATH)/res
@@ -58,6 +53,7 @@ ifeq (,$(TARGET_BUILD_APPS))
   include packages/apps/Car/libs/car-list/car-list.mk
   include packages/apps/Car/libs/car-apps-common/car-apps-common.mk
   include packages/services/Car/car-support-lib/car-support.mk
+  include frameworks/opt/setupwizard/library/common-gingerbread.mk
   include frameworks/base/packages/SettingsLib/common.mk
 
   include $(BUILD_PACKAGE)
