@@ -145,18 +145,17 @@ public final class UserManagerHelper {
 
     /**
      * Creates a new user on the system.
-     * If new user is successfully created, automatically switches to that user.
      */
-    public void createNewUser() {
+    public UserInfo createNewUser() {
         UserInfo user = mUserManager.createUser(
                 mContext.getString(R.string.user_new_user_name), 0 /* flags */);
         if (user == null) {
             // Couldn't create user, most likely because there are too many, but we haven't
             // been able to reload the list yet.
             Log.w(TAG, "can't create user.");
-            return;
+            return null;
         }
-        switchToUserId(user.id);
+        return user;
     }
 
     /**
@@ -178,6 +177,45 @@ public final class UserManagerHelper {
         }
 
         return mUserManager.removeUser(userInfo.id);
+    }
+
+    /**
+     * Checks whether the user is system user (admin).
+     *
+     * @param userInfo User to check against system user.
+     * @return {@code true} if system user, {@code false} otherwise.
+     */
+    public boolean userIsSystemUser(UserInfo userInfo) {
+        return userInfo.id == UserHandle.USER_SYSTEM;
+    }
+
+    /**
+     * Returns whether this user can be removed from the system.
+     *
+     * @param userInfo User to be removed
+     * @return {@code true} if they can be removed, {@code false} otherwise.
+     */
+    public boolean userCanBeRemoved(UserInfo userInfo) {
+        return !userIsSystemUser(userInfo);
+    }
+
+    /**
+     * Checks whether currently logged in user is also the system user (admin).
+     *
+     * @return {@code true} if current user is admin, {@code false} otherwise.
+     */
+    public boolean currentUserIsSystemUser() {
+        return userIsSystemUser(getCurrentUserInfo());
+    }
+
+    /**
+     * Checks whether passed in user is the user that's currently logged in.
+     *
+     * @param userInfo User to check.
+     * @return {@code true} if current user, {@code false} otherwise.
+     */
+    public boolean userIsCurrentUser(UserInfo userInfo) {
+        return getCurrentUserInfo().id == userInfo.id;
     }
 
     /**
