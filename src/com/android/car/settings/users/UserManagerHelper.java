@@ -22,6 +22,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.UserInfo;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
@@ -31,8 +32,8 @@ import android.os.UserManager;
 import android.util.Log;
 
 import com.android.car.settings.R;
+import com.android.internal.util.UserIcons;
 
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
@@ -42,27 +43,14 @@ import java.util.List;
 public final class UserManagerHelper {
     private static final String TAG = "UserManagerHelper";
     private final Context mContext;
-    private OnUsersUpdateListener mUpdateListener;
-
     private final UserManager mUserManager;
-
+    private OnUsersUpdateListener mUpdateListener;
     private final BroadcastReceiver mUserChangeReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             mUpdateListener.onUsersUpdate();
         }
     };
-
-    /**
-     * Interface for listeners that want to register for receiving updates to changes to the users
-     * on the system including removing and adding users, and changing user info.
-     */
-    public interface OnUsersUpdateListener {
-        /**
-         * Method that will get called when users list has been changed.
-         */
-        void onUsersUpdate();
-    }
 
     public UserManagerHelper(Context context) {
         mContext = context;
@@ -96,16 +84,6 @@ public final class UserManagerHelper {
     }
 
     /**
-     * Sets new Username for the user.
-     *
-     * @param user User who's name should be changed.
-     * @param name New username.
-     */
-    public void setUserName(UserInfo user, String name) {
-        mUserManager.setUserName(user.id, name);
-    }
-
-    /**
      * Gets all the other users on the system that are not the current user.
      *
      * @return List of {@code UserInfo} for each user that is not the current user.
@@ -113,7 +91,7 @@ public final class UserManagerHelper {
     public List<UserInfo> getOtherUsers() {
         List<UserInfo> others = mUserManager.getUsers(true);
 
-        for (Iterator<UserInfo> iterator = others.iterator(); iterator.hasNext();) {
+        for (Iterator<UserInfo> iterator = others.iterator(); iterator.hasNext(); ) {
             UserInfo userInfo = iterator.next();
             if (userInfo.id == UserHandle.myUserId()) {
                 // Remove current user from the list.
@@ -124,60 +102,16 @@ public final class UserManagerHelper {
     }
 
     /**
-     * Gets an icon for the user.
+     * Returns whether or not this user has gone through its first-time initialization.
      *
-     * @param userInfo User for which we want to get the icon.
-     * @return a drawable for the icon
+     * @param user User whose initialization we're checking.
+     * @return {@code true} if initialized, {@code false} if it's not.
      */
-    public Drawable getUserIcon(UserInfo userInfo) {
-        Bitmap picture = mUserManager.getUserIcon(userInfo.id);
-
-        if (picture == null) {
-            return mContext.getDrawable(R.drawable.ic_user);
-        }
-
-        int avatarSize = mContext.getResources()
-                .getDimensionPixelSize(R.dimen.car_primary_icon_size);
-        picture = Bitmap.createScaledBitmap(
-                picture, avatarSize, avatarSize, true /* filter */);
-        return new BitmapDrawable(mContext.getResources(), picture);
+    public boolean isInitialized(UserInfo user) {
+        return (user.flags & UserInfo.FLAG_INITIALIZED) != 0;
     }
 
-    /**
-     * Creates a new user on the system.
-     */
-    public UserInfo createNewUser() {
-        UserInfo user = mUserManager.createUser(
-                mContext.getString(R.string.user_new_user_name), 0 /* flags */);
-        if (user == null) {
-            // Couldn't create user, most likely because there are too many, but we haven't
-            // been able to reload the list yet.
-            Log.w(TAG, "can't create user.");
-            return null;
-        }
-        return user;
-    }
-
-    /**
-     * Tries to remove the user that's passed in. System user cannot be removed.
-     * If the user to be removed is current user, it switches to the system user first, and then
-     * removes the user.
-     *
-     * @param userInfo User to be removed
-     * @return {@code true} if user is successfully removed, {@code false} otherwise.
-     */
-    public boolean removeUser(UserInfo userInfo) {
-        if (userInfo.id == UserHandle.USER_SYSTEM) {
-            Log.w(TAG, "User " + userInfo.id + " is system user, could not be removed.");
-            return false;
-        }
-
-        if (userInfo.id == getCurrentUserInfo().id) {
-            switchToUserId(UserHandle.USER_SYSTEM);
-        }
-
-        return mUserManager.removeUser(userInfo.id);
-    }
+    // User information accessors
 
     /**
      * Checks whether the user is system user (admin).
@@ -200,15 +134,6 @@ public final class UserManagerHelper {
     }
 
     /**
-     * Checks whether currently logged in user is also the system user (admin).
-     *
-     * @return {@code true} if current user is admin, {@code false} otherwise.
-     */
-    public boolean currentUserIsSystemUser() {
-        return userIsSystemUser(getCurrentUserInfo());
-    }
-
-    /**
      * Checks whether passed in user is the user that's currently logged in.
      *
      * @param userInfo User to check.
@@ -216,6 +141,110 @@ public final class UserManagerHelper {
      */
     public boolean userIsCurrentUser(UserInfo userInfo) {
         return getCurrentUserInfo().id == userInfo.id;
+    }
+
+    // Current user information accessors
+
+    /**
+     * Checks if the current user is a demo user.
+     */
+    public boolean isDemoUser() {
+        return mUserManager.isDemoUser();
+    }
+
+    /**
+     * Checks if the current user is a guest user.
+     */
+    public boolean isGuestUser() {
+        return mUserManager.isGuestUser();
+    }
+
+    /**
+     * Checks if the current user is the system user (User 0).
+     */
+    public boolean isSystemUser() {
+        return mUserManager.isSystemUser();
+    }
+
+    // Current user restriction accessors
+
+    /**
+     * Return whether the current user has a restriction.
+     *
+     * @param restriction Restriction to check. Should be a UserManager.* restriction.
+     * @return Whether that restriction exists for the current user.
+     */
+    public boolean hasUserRestriction(String restriction) {
+        return mUserManager.hasUserRestriction(restriction);
+    }
+
+    /**
+     * Checks if the current user can add new users.
+     */
+    public boolean canAddUsers() {
+        return !hasUserRestriction(UserManager.DISALLOW_ADD_USER);
+    }
+
+    /**
+     * Checks if the current user can remove users.
+     */
+    public boolean canRemoveUsers() {
+        return !hasUserRestriction(UserManager.DISALLOW_REMOVE_USER);
+    }
+
+    /**
+     * Checks if the current user is allowed to switch to another user.
+     */
+    public boolean canSwitchUsers() {
+        return !hasUserRestriction(UserManager.DISALLOW_USER_SWITCH);
+    }
+
+    /**
+     * Checks if the current user can modify accounts. Demo and Guest users cannot modify accounts
+     * even if the DISALLOW_MODIFY_ACCOUNTS restriction is not applied.
+     */
+    public boolean canModifyAccounts() {
+        return !hasUserRestriction(UserManager.DISALLOW_MODIFY_ACCOUNTS) && !isDemoUser()
+                && !isGuestUser();
+    }
+
+    // User actions
+
+    /**
+     * Creates a new user on the system.
+     */
+    public UserInfo createNewUser() {
+        UserInfo user = mUserManager.createUser(
+                mContext.getString(R.string.user_new_user_name), 0 /* flags */);
+        if (user == null) {
+            // Couldn't create user, most likely because there are too many, but we haven't
+            // been able to reload the list yet.
+            Log.w(TAG, "can't create user.");
+            return null;
+        }
+        assignDefaultIcon(user);
+        return user;
+    }
+
+    /**
+     * Tries to remove the user that's passed in. System user cannot be removed.
+     * If the user to be removed is current user, it switches to the system user first, and then
+     * removes the user.
+     *
+     * @param userInfo User to be removed
+     * @return {@code true} if user is successfully removed, {@code false} otherwise.
+     */
+    public boolean removeUser(UserInfo userInfo) {
+        if (userInfo.id == UserHandle.USER_SYSTEM) {
+            Log.w(TAG, "User " + userInfo.id + " is system user, could not be removed.");
+            return false;
+        }
+
+        if (userInfo.id == getCurrentUserInfo().id) {
+            switchToUserId(UserHandle.USER_SYSTEM);
+        }
+
+        return mUserManager.removeUser(userInfo.id);
     }
 
     /**
@@ -260,12 +289,59 @@ public final class UserManagerHelper {
         switchToUserId(guest.id);
     }
 
+    /**
+     * Gets an icon for the user.
+     *
+     * @param userInfo User for which we want to get the icon.
+     * @return a drawable for the icon
+     */
+    public Drawable getUserIcon(UserInfo userInfo) {
+        Bitmap picture = mUserManager.getUserIcon(userInfo.id);
+
+        if (picture == null) {
+            picture = assignDefaultIcon(userInfo);
+        }
+
+        if (picture == null) {
+            return mContext.getDrawable(R.drawable.ic_user);
+        }
+
+        int avatarSize = mContext.getResources()
+                .getDimensionPixelSize(R.dimen.car_primary_icon_size);
+        picture = Bitmap.createScaledBitmap(
+                picture, avatarSize, avatarSize, true /* filter */);
+        return new BitmapDrawable(mContext.getResources(), picture);
+    }
+
+    /**
+     * Assigns a default icon to a user according to the user's id.
+     *
+     * @param userInfo User to assign a default icon to.
+     * @return Bitmap that has been assigned to the user.
+     */
+    private Bitmap assignDefaultIcon(UserInfo userInfo) {
+        Bitmap bitmap = UserIcons.convertToBitmap(
+                UserIcons.getDefaultUserIcon(mContext.getResources(), userInfo.id, false));
+        mUserManager.setUserIcon(userInfo.id, bitmap);
+        return bitmap;
+    }
+
     private void switchToUserId(int id) {
         try {
             ActivityManager.getService().switchUser(id);
         } catch (RemoteException e) {
             Log.e(TAG, "Couldn't switch user.", e);
         }
+    }
+
+    /**
+     * Sets new Username for the user.
+     *
+     * @param user User whose name should be changed.
+     * @param name New username.
+     */
+    public void setUserName(UserInfo user, String name) {
+        mUserManager.setUserName(user.id, name);
     }
 
     private void registerReceiver() {
@@ -278,5 +354,16 @@ public final class UserManagerHelper {
 
     private void unregisterReceiver() {
         mContext.unregisterReceiver(mUserChangeReceiver);
+    }
+
+    /**
+     * Interface for listeners that want to register for receiving updates to changes to the users
+     * on the system including removing and adding users, and changing user info.
+     */
+    public interface OnUsersUpdateListener {
+        /**
+         * Method that will get called when users list has been changed.
+         */
+        void onUsersUpdate();
     }
 }
