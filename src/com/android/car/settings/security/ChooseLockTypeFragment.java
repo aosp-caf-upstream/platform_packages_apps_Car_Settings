@@ -16,30 +16,23 @@
 
 package com.android.car.settings.security;
 
-import android.app.admin.DevicePolicyManager;
-import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 
 import com.android.car.settings.R;
 import com.android.car.settings.common.ListItemSettingsFragment;
-import com.android.internal.widget.LockPatternUtils;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import androidx.car.widget.ListItemProvider;
 import androidx.car.widget.ListItem;
+import androidx.car.widget.ListItemProvider;
 import androidx.car.widget.TextListItem;
 
 /**
  * Give user choices of lock screen type: Pin/Pattern/Password or None.
  */
 public class ChooseLockTypeFragment extends ListItemSettingsFragment {
-    static final String LOCK_PATTERN = "lockPattern";
-    static final String LOCK_PIN = "lockPin";
-    static final String LOCK_PASSWORD = "lockPassword";
-
     // Arbitrary request code for choose security lock activity.
     private static final int REQUEST_CHOOSE_LOCK = 10001;
 
@@ -52,11 +45,6 @@ public class ChooseLockTypeFragment extends ListItemSettingsFragment {
         bundle.putInt(EXTRA_ACTION_BAR_LAYOUT, R.layout.action_bar_with_button);
         chooseLockTypeFragment.setArguments(bundle);
         return chooseLockTypeFragment;
-    }
-
-    @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
     }
 
     @Override
@@ -103,15 +91,11 @@ public class ChooseLockTypeFragment extends ListItemSettingsFragment {
 
     private void startChooseLockPasswordActivity() {
         Intent intent = new Intent(getContext(), ChooseLockPasswordActivity.class);
-        intent.putExtra(LockPatternUtils.PASSWORD_TYPE_KEY,
-                DevicePolicyManager.PASSWORD_QUALITY_ALPHANUMERIC);
         startActivityForResult(intent, REQUEST_CHOOSE_LOCK);
     }
 
     private void startChooseLockPinActivity() {
-        Intent intent = new Intent(getContext(), ChooseLockPasswordActivity.class);
-        intent.putExtra(LockPatternUtils.PASSWORD_TYPE_KEY,
-                DevicePolicyManager.PASSWORD_QUALITY_NUMERIC);
+        Intent intent = new Intent(getContext(), ChooseLockPinActivity.class);
         startActivityForResult(intent, REQUEST_CHOOSE_LOCK);
     }
 }
